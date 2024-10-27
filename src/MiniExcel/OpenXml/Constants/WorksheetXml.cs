@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Linq;
 
 namespace MiniExcelLibs.OpenXml.Constants
 {
@@ -47,6 +48,16 @@ namespace MiniExcelLibs.OpenXml.Constants
         internal const string StartCols = "<x:cols>";
         internal static string Column(int? colIndex, double? columnWidth)
             => $@"<x:col min=""{colIndex.GetValueOrDefault() + 1}"" max=""{colIndex.GetValueOrDefault() + 1}"" width=""{columnWidth?.ToString(CultureInfo.InvariantCulture)}"" customWidth=""1"" />";
+
+        public static string ColumnPlaceholderStart(int colIndex)
+            => $@"<x:col min=""{colIndex}"" max=""{colIndex}"" width=""";
+
+        private const string _customWidth = @"customWidth=""1""";
+
+        public static string ColumnPlaceholderEnd = $@"""{new string(' ', int.MaxValue.ToString().Length + _customWidth.Length)} />";
+
+        public static string ColumnWidth(double width) => $@"{width.ToString("F", CultureInfo.InvariantCulture)}"" {_customWidth}";
+
         internal const string EndCols = "</x:cols>";
 
         internal static string EmptyCell(string cellReference, string styleIndex)

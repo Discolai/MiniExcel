@@ -32,6 +32,11 @@ namespace MiniExcelLibs.OpenXml
             // Why ZipArchiveMode.Update not ZipArchiveMode.Create?
             // R : Mode create - ZipArchiveEntry does not support seeking.'
             this._configuration = configuration as OpenXmlConfiguration ?? OpenXmlConfiguration.DefaultConfig;
+            if (_configuration.EnableAutoWidth && !_configuration.FastMode)
+            {
+                throw new InvalidOperationException("Auto width requires fast mode to be enabled");
+            }
+
             if (_configuration.FastMode)
                 this._archive = new MiniExcelZipArchive(_stream, ZipArchiveMode.Update, true, _utf8WithBom);
             else

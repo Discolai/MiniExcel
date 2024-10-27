@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
@@ -240,8 +241,17 @@ namespace MiniExcelLibs.OpenXml
                 await writer.WriteAsync(WorksheetXml.Dimension(GetDimensionRef(maxRowIndex, maxColumnIndex)));
             }
 
+
             //cols:width
-            await WriteColumnsWidthsAsync(writer, props);
+            ExcelWidthCollection widths = null;
+            if (_configuration.EnableAutoWidth)
+            {
+                widths = await WriteColumnWidthPlaceholders(writer, props);
+            }
+            else
+            {
+                await WriteColumnsWidthsAsync(writer, props);
+            }
 
             //header
             await writer.WriteAsync(WorksheetXml.StartSheetData);
@@ -259,13 +269,13 @@ namespace MiniExcelLibs.OpenXml
                 switch (mode)
                 {
                     case "IDictionary<string, object>": //Dapper Row
-                        maxRowIndex = await GenerateSheetByColumnInfoAsync<IDictionary<string, object>>(writer, enumerator, props, xIndex, yIndex);
+                        maxRowIndex = await GenerateSheetByColumnInfoAsync<IDictionary<string, object>>(writer, enumerator, props, widths, xIndex, yIndex);
                         break;
                     case "IDictionary":
-                        maxRowIndex = await GenerateSheetByColumnInfoAsync<IDictionary>(writer, enumerator, props, xIndex, yIndex);
+                        maxRowIndex = await GenerateSheetByColumnInfoAsync<IDictionary>(writer, enumerator, props, widths, xIndex, yIndex);
                         break;
                     case "Properties":
-                        maxRowIndex = await GenerateSheetByColumnInfoAsync<object>(writer, enumerator, props, xIndex, yIndex);
+                        maxRowIndex = await GenerateSheetByColumnInfoAsync<object>(writer, enumerator, props, widths, xIndex, yIndex);
                         break;
                     default:
                         throw new NotImplementedException($"Type {values.GetType().FullName} is not implemented. Please open an issue.");
@@ -285,6 +295,10 @@ namespace MiniExcelLibs.OpenXml
             if (_configuration.FastMode && rowCount == null)
             {
                 await WriteDimensionAsync(writer, maxRowIndex, maxColumnIndex, dimensionPlaceholderPostition);
+            }
+            if (_configuration.EnableAutoWidth)
+            {
+                await OverWriteColumnWidthPlaceholders(writer, widths);
             }
         }
 
@@ -369,6 +383,43 @@ namespace MiniExcelLibs.OpenXml
             await writer.WriteAsync(WorksheetXml.EndCols);
         }
 
+        private async Task<ExcelWidthCollection> WriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, IEnumerable<ExcelColumnInfo> props)
+        {
+            var widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth);
+            await writer.WriteAsync(WorksheetXml.StartCols);
+
+            foreach (var p in props)
+            {
+                if (p == null)
+                {
+                    continue;
+                }
+                var colIndex = p.ExcelColumnIndex.GetValueOrDefault() + 1;
+                var placeholderPosition = await writer.WriteAndFlushAsync(WorksheetXml.ColumnPlaceholderStart(colIndex));
+                await writer.WriteAsync(WorksheetXml.ColumnPlaceholderEnd);
+
+                widths.Add(colIndex, p.ExcelColumnWidth, placeholderPosition);
+            }
+
+            await writer.WriteAsync(WorksheetXml.EndCols);
+
+            return widths;
+        }
+
+        private async Task OverWriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, ExcelWidthCollection widthCollection)
+        {
+            // Flush and save position so that we can get back again.
+            var position = await writer.FlushAsync();
+
+            foreach (var column in widthCollection.Columns)
+            {
+                writer.SetPosition(column.PlaceholderPosition);
+                await writer.WriteAndFlushAsync(WorksheetXml.ColumnWidth(column.Width));
+            }
+
+            writer.SetPosition(position);
+        }
+
         private static async Task PrintHeaderAsync(MiniExcelAsyncStreamWriter writer, List<ExcelColumnInfo> props)
         {
             var xIndex = 1;
@@ -391,7 +442,7 @@ namespace MiniExcelLibs.OpenXml
             await writer.WriteAsync(WorksheetXml.EndRow);
         }
 
-        private async Task<int> GenerateSheetByColumnInfoAsync<T>(MiniExcelAsyncStreamWriter writer, IEnumerator value, List<ExcelColumnInfo> props, int xIndex = 1, int yIndex = 1)
+        private async Task<int> GenerateSheetByColumnInfoAsync<T>(MiniExcelAsyncStreamWriter writer, IEnumerator value, List<ExcelColumnInfo> props, ExcelWidthCollection widthCollection, int xIndex = 1, int yIndex = 1)
         {
             var isDic = typeof(T) == typeof(IDictionary);
             var isDapperRow = typeof(T) == typeof(IDictionary<string, object>);
@@ -426,7 +477,7 @@ namespace MiniExcelLibs.OpenXml
                         cellValue = p.Property.GetValue(v);
                     }
 
-                    await WriteCellAsync(writer, yIndex, cellIndex, cellValue, p);
+                    await WriteCellAsync(writer, yIndex, cellIndex, cellValue, p, widthCollection);
 
                     cellIndex++;
                 }
@@ -443,7 +494,7 @@ namespace MiniExcelLibs.OpenXml
             await writer.WriteAsync(WorksheetXml.Cell(cellReference, "str", "1", ExcelOpenXmlUtils.EncodeXML(columnName)));
         }
 
-        private async Task WriteCellAsync(MiniExcelAsyncStreamWriter writer, int rowIndex, int cellIndex, object value, ExcelColumnInfo p)
+        private async Task WriteCellAsync(MiniExcelAsyncStreamWriter writer, int rowIndex, int cellIndex, object value, ExcelColumnInfo p, ExcelWidthCollection widthCollection = null)
         {
             var columnReference = ExcelOpenXmlUtils.ConvertXyToCell(cellIndex, rowIndex);
             var valueIsNull = value is null || value is DBNull;
@@ -463,6 +514,7 @@ namespace MiniExcelLibs.OpenXml
             /*Prefix and suffix blank space will lost after SaveAs #294*/
             var preserveSpace = cellValue != null && (cellValue.StartsWith(" ", StringComparison.Ordinal) || cellValue.EndsWith(" ", StringComparison.Ordinal));
             await writer.WriteAsync(WorksheetXml.Cell(columnReference, dataType, styleIndex, cellValue, preserveSpace: preserveSpace));
+            widthCollection?.AdjustWidth(cellIndex, cellValue);
         }
 
         private async Task GenerateEndXmlAsync(CancellationToken cancellationToken)
