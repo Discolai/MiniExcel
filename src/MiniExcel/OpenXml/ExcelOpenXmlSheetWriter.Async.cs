@@ -398,7 +398,7 @@ namespace MiniExcelLibs.OpenXml
         private async Task<long> WriteColumnWidthPlaceholdersAsync(MiniExcelAsyncStreamWriter writer, ICollection<ExcelColumnInfo> props)
         {
             var placeholderPosition = await writer.FlushAsync();
-            await writer.WriteWhiteSpaceAsync(WorksheetXml.GetColumnPlaceholderLength(props.Count));
+            await writer.WriteWhitespaceAsync(WorksheetXml.GetColumnPlaceholderLength(props.Count));
             return placeholderPosition;
         }
 
