@@ -119,7 +119,7 @@ namespace MiniExcelLibs.OpenXml
                 }
                 maxColumnIndex = props.Count;
 
-                await WriteColumnsWidthsAsync(writer, props);
+                await WriteColumnsWidthsAsync(writer, ExcelColumnWidth.FromProps(props));
 
                 await writer.WriteAsync(WorksheetXml.StartSheetData);
                 int fieldCount = reader.FieldCount;
@@ -244,13 +244,15 @@ namespace MiniExcelLibs.OpenXml
 
             //cols:width
             ExcelWidthCollection widths = null;
+            long columnWidthsPlaceholderPosition = 0;
             if (_configuration.EnableAutoWidth)
             {
-                widths = await WriteColumnWidthPlaceholders(writer, props);
+                columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholders(writer, props);
+                widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth, props);
             }
             else
             {
-                await WriteColumnsWidthsAsync(writer, props);
+                await WriteColumnsWidthsAsync(writer, ExcelColumnWidth.FromProps(props));
             }
 
             //header
@@ -298,7 +300,7 @@ namespace MiniExcelLibs.OpenXml
             }
             if (_configuration.EnableAutoWidth)
             {
-                await OverWriteColumnWidthPlaceholders(writer, widths);
+                await OverWriteColumnWidthPlaceholders(writer, columnWidthsPlaceholderPosition, widths.Columns);
             }
         }
 
@@ -322,7 +324,7 @@ namespace MiniExcelLibs.OpenXml
                 props.Add(prop);
             }
 
-            await WriteColumnsWidthsAsync(writer, props);
+            await WriteColumnsWidthsAsync(writer, ExcelColumnWidth.FromProps(props));
 
             await writer.WriteAsync(WorksheetXml.StartSheetData);
             if (_printHeader)
@@ -365,59 +367,59 @@ namespace MiniExcelLibs.OpenXml
             await writer.WriteAsync(WorksheetXml.EndWorksheet);
         }
 
-        private static async Task WriteColumnsWidthsAsync(MiniExcelAsyncStreamWriter writer, IEnumerable<ExcelColumnInfo> props)
+        //private static async Task WriteColumnsWidthsAsync(MiniExcelAsyncStreamWriter writer, IEnumerable<ExcelColumnInfo> props)
+        //{
+        //    var ecwProps = props.Where(x => x?.ExcelColumnWidth != null).ToList();
+        //    if (ecwProps.Count <= 0)
+        //    {
+        //        return;
+        //    }
+
+        //    await writer.WriteAsync(WorksheetXml.StartCols);
+
+        //    foreach (var p in ecwProps)
+        //    {
+        //        await writer.WriteAsync(WorksheetXml.Column(p.ExcelColumnIndex, p.ExcelColumnWidth));
+        //    }
+
+        //    await writer.WriteAsync(WorksheetXml.EndCols);
+        //}
+
+        private async Task<long> WriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, ICollection<ExcelColumnInfo> props)
         {
-            var ecwProps = props.Where(x => x?.ExcelColumnWidth != null).ToList();
-            if (ecwProps.Count <= 0)
+            var placeholderPosition = await writer.FlushAsync();
+            await writer.WriteWhiteSpaceAsync(WorksheetXml.GetColumnPlaceholderLength(props.Count));
+            return placeholderPosition;
+        }
+
+        private async Task OverWriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, long placeholderPosition, IEnumerable<ExcelColumnWidth> columnWidths)
+        {
+            var position = await writer.FlushAsync();
+
+            writer.SetPosition(placeholderPosition);
+            await WriteColumnsWidthsAsync(writer, columnWidths);
+
+            await writer.FlushAsync();
+            writer.SetPosition(position);
+        }
+
+        private async Task WriteColumnsWidthsAsync(MiniExcelAsyncStreamWriter writer, IEnumerable<ExcelColumnWidth> columnWidths)
+        {
+            var hasWrittenStart = false;
+            foreach (var column in columnWidths)
+            {
+                if (!hasWrittenStart)
+                {
+                    await writer.WriteAsync(WorksheetXml.StartCols);
+                    hasWrittenStart = true;
+                }
+                await writer.WriteAsync(WorksheetXml.Column(column.Index, column.Width));
+            }
+            if (!hasWrittenStart)
             {
                 return;
             }
-
-            await writer.WriteAsync(WorksheetXml.StartCols);
-
-            foreach (var p in ecwProps)
-            {
-                await writer.WriteAsync(WorksheetXml.Column(p.ExcelColumnIndex, p.ExcelColumnWidth));
-            }
-
             await writer.WriteAsync(WorksheetXml.EndCols);
-        }
-
-        private async Task<ExcelWidthCollection> WriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, IEnumerable<ExcelColumnInfo> props)
-        {
-            var widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth);
-            await writer.WriteAsync(WorksheetXml.StartCols);
-
-            foreach (var p in props)
-            {
-                if (p == null)
-                {
-                    continue;
-                }
-                var colIndex = p.ExcelColumnIndex.GetValueOrDefault() + 1;
-                var placeholderPosition = await writer.WriteAndFlushAsync(WorksheetXml.ColumnPlaceholderStart(colIndex));
-                await writer.WriteAsync(WorksheetXml.ColumnPlaceholderEnd);
-
-                widths.Add(colIndex, p.ExcelColumnWidth, placeholderPosition);
-            }
-
-            await writer.WriteAsync(WorksheetXml.EndCols);
-
-            return widths;
-        }
-
-        private async Task OverWriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, ExcelWidthCollection widthCollection)
-        {
-            // Flush and save position so that we can get back again.
-            var position = await writer.FlushAsync();
-
-            foreach (var column in widthCollection.Columns)
-            {
-                writer.SetPosition(column.PlaceholderPosition);
-                await writer.WriteAndFlushAsync(WorksheetXml.ColumnWidth(column.Width));
-            }
-
-            writer.SetPosition(position);
         }
 
         private static async Task PrintHeaderAsync(MiniExcelAsyncStreamWriter writer, List<ExcelColumnInfo> props)

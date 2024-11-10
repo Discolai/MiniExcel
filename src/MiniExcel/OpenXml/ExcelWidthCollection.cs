@@ -1,39 +1,44 @@
 ﻿using MiniExcelLibs.Utils;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
+using System.Linq;
 
 namespace MiniExcelLibs.OpenXml
 {
+    internal class ExcelColumnWidth
+    {
+        public int Index { get; set; }
+        public double Width { get; set; }
+
+        public static IEnumerable<ExcelColumnWidth> FromProps(IEnumerable<ExcelColumnInfo> props, double? minWidth = null)
+        {
+            foreach (var p in props)
+            {
+                if (p == null || (p.ExcelColumnWidth == null && minWidth == null))
+                {
+                    continue;
+                }
+                var colIndex = p.ExcelColumnIndex.GetValueOrDefault() + 1;
+                yield return new ExcelColumnWidth
+                {
+                    Index = colIndex,
+                    Width = p.ExcelColumnWidth ?? minWidth.Value,
+                };
+            }
+        }
+    }
+
     internal sealed class ExcelWidthCollection
     {
-        internal class ExcelColumnInfo
-        {
-            public int Index { get; set; }
-            public double Width { get; set; }
-            public long PlaceholderPosition { get; set; }
-        }
-
-        private readonly Dictionary<int,ExcelColumnInfo> _columnWidths = new Dictionary<int, ExcelColumnInfo>();
-        private readonly double _minWidth;
+        private readonly Dictionary<int, ExcelColumnWidth> _columnWidths;
         private readonly double _maxWidth;
 
-        public IEnumerable<ExcelColumnInfo> Columns => _columnWidths.Values;
+        public IEnumerable<ExcelColumnWidth> Columns => _columnWidths.Values;
 
-        public ExcelWidthCollection(double minWidth, double maxWidth)
+        public ExcelWidthCollection(double minWidth, double maxWidth, IEnumerable<ExcelColumnInfo> props)
         {
-            _minWidth = minWidth;
             _maxWidth = maxWidth;
-        }
-
-        public void Add(int index, double? initialWidth, long placeholderPosition) 
-        {
-            _columnWidths.Add(index, new ExcelColumnInfo
-            {
-                Index = index,
-                Width = initialWidth ?? _minWidth,
-                PlaceholderPosition = placeholderPosition
-            });
+            _columnWidths = ExcelColumnWidth.FromProps(props, minWidth).ToDictionary(x => x.Index);
         }
 
         public void AdjustWidth(int columnIndex, string columnValue)
@@ -43,22 +48,25 @@ namespace MiniExcelLibs.OpenXml
                 return;
             }
 
-            currentWidth.Width = Math.Min(_maxWidth, Math.Max(currentWidth.Width, GetExcelColumnWidth(columnValue)));
+            var adjustedWidth = Math.Max(currentWidth.Width, GetApproximateCalibriWidth(columnValue));
+            currentWidth.Width = Math.Min(_maxWidth, adjustedWidth);
         }
 
-        private const double _averageCalibriPt11PixelSize = 6.2;
-        private const double _excelWidthFactor = 5.0 / 7.0;
-        private const int _padding = 5;
-
-        private static double GetExcelColumnWidth(string text)
+        /// <summary>
+        /// Get the approximate width of the given text for Calibri 11pt
+        /// </summary>
+        /// <remarks>
+        /// Rounds the result to 2 decimal places.
+        /// </remarks>
+        private static double GetApproximateCalibriWidth(string text)
         {
-            // Calculate approximate width in pixels
-            double textWidthInPixels = text.Length * _averageCalibriPt11PixelSize + (_padding * 2);
+            double characterWidthFactor = 1.2;  // Estimated factor for Calibri, 11pt
+            double padding = 2;  // Add some padding for extra spacing
 
-            // Convert to Excel column width
-            double excelColumnWidth = textWidthInPixels * _excelWidthFactor;
-            return excelColumnWidth;
+            int characterCount = text.Length;
+            double excelColumnWidth = (characterCount * characterWidthFactor) + padding;
+
+            return Math.Round(excelColumnWidth, 2);
         }
-
     }
 }

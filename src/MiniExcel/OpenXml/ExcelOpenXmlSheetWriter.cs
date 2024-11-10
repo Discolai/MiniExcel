@@ -158,7 +158,7 @@ namespace MiniExcelLibs.OpenXml
                 //sheet view
                 WriteSheetViews(writer);
 
-                WriteColumnsWidths(writer, props);
+                WriteColumnsWidths(writer, ExcelColumnWidth.FromProps(props));
 
                 writer.Write(WorksheetXml.StartSheetData);
                 int fieldCount = reader.FieldCount;
@@ -286,7 +286,7 @@ namespace MiniExcelLibs.OpenXml
             WriteSheetViews(writer);
 
             //cols:width
-            WriteColumnsWidths(writer, props);
+            WriteColumnsWidths(writer, ExcelColumnWidth.FromProps(props));
 
             //header
             writer.Write(WorksheetXml.StartSheetData);
@@ -358,7 +358,7 @@ namespace MiniExcelLibs.OpenXml
             //sheet view
             WriteSheetViews(writer);
 
-            WriteColumnsWidths(writer, props);
+            WriteColumnsWidths(writer, ExcelColumnWidth.FromProps(props));
 
             writer.Write(WorksheetXml.StartSheetData);
             if (_printHeader)
@@ -401,17 +401,22 @@ namespace MiniExcelLibs.OpenXml
             writer.Write(WorksheetXml.EndWorksheet);
         }
 
-        private static void WriteColumnsWidths(MiniExcelStreamWriter writer, IEnumerable<ExcelColumnInfo> props)
+        private static void WriteColumnsWidths(MiniExcelStreamWriter writer, IEnumerable<ExcelColumnWidth> columnWidths)
         {
-            var ecwProps = props.Where(x => x?.ExcelColumnWidth != null).ToList();
-            if (ecwProps.Count <= 0)
-                return;
-            writer.Write(WorksheetXml.StartCols);
-            foreach (var p in ecwProps)
+            var hasWrittenStart = false;
+            foreach (var column in columnWidths)
             {
-                writer.Write(WorksheetXml.Column(p.ExcelColumnIndex, p.ExcelColumnWidth));
+                if (!hasWrittenStart)
+                {
+                    writer.Write(WorksheetXml.StartCols);
+                    hasWrittenStart = true;
+                }
+                writer.Write(WorksheetXml.Column(column.Index, column.Width));
             }
-
+            if (!hasWrittenStart)
+            {
+                return;
+            }
             writer.Write(WorksheetXml.EndCols);
         }
 

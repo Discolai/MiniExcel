@@ -39,6 +39,11 @@ namespace MiniExcelLibs.OpenXml
             return await this.FlushAsync();
         }
 
+        public async Task WriteWhiteSpaceAsync(int lenght)
+        {
+            await _streamWriter.WriteAsync(new string(' ', lenght));
+        }
+
         public async Task<long> FlushAsync()
         {
             this._cancellationToken.ThrowIfCancellationRequested();
