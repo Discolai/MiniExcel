@@ -395,24 +395,6 @@ namespace MiniExcelLibs.OpenXml
             await writer.WriteAsync(WorksheetXml.EndWorksheet);
         }
 
-        //private static async Task WriteColumnsWidthsAsync(MiniExcelAsyncStreamWriter writer, IEnumerable<ExcelColumnInfo> props)
-        //{
-        //    var ecwProps = props.Where(x => x?.ExcelColumnWidth != null).ToList();
-        //    if (ecwProps.Count <= 0)
-        //    {
-        //        return;
-        //    }
-
-        //    await writer.WriteAsync(WorksheetXml.StartCols);
-
-        //    foreach (var p in ecwProps)
-        //    {
-        //        await writer.WriteAsync(WorksheetXml.Column(p.ExcelColumnIndex, p.ExcelColumnWidth));
-        //    }
-
-        //    await writer.WriteAsync(WorksheetXml.EndCols);
-        //}
-
         private async Task<long> WriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, ICollection<ExcelColumnInfo> props)
         {
             var placeholderPosition = await writer.FlushAsync();
