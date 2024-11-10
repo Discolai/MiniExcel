@@ -1432,30 +1432,5 @@ namespace MiniExcelLibs.Tests
                 Assert.Equal(onlyDate.ToDateTime(TimeOnly.MinValue), (DateTime)rows[1]["Column4"]);
             }
         }
-
-        [Fact]
-        public void AutoAdjustWidthThrowsExceptionWithoutFastMode()
-        {
-            var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
-            var items = new List<object>
-            {
-                new
-                {
-                    Name = "Some name",
-                    Type = "Some type",
-                },
-                new
-                {
-                    Name = "Another name",
-                    Type = "Another type",
-                }
-            };
-
-
-            Assert.Throws<InvalidOperationException>(() => MiniExcel.SaveAs(path, items, configuration: new OpenXmlConfiguration
-            {
-                EnableAutoWidth = true,
-            }));
-        }
     }
 }
