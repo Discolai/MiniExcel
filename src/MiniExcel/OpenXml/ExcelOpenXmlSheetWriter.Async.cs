@@ -123,7 +123,7 @@ namespace MiniExcelLibs.OpenXml
 
                 if (_configuration.EnableAutoWidth)
                 {
-                    columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholders(writer, props);
+                    columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholdersAsync(writer, props);
                     widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth, props);
                 }
                 else
@@ -172,7 +172,7 @@ namespace MiniExcelLibs.OpenXml
             }
             if (_configuration.EnableAutoWidth)
             {
-                await OverWriteColumnWidthPlaceholders(writer, columnWidthsPlaceholderPosition, widths.Columns);
+                await OverWriteColumnWidthPlaceholdersAsync(writer, columnWidthsPlaceholderPosition, widths.Columns);
             }
         }
 
@@ -261,7 +261,7 @@ namespace MiniExcelLibs.OpenXml
             long columnWidthsPlaceholderPosition = 0;
             if (_configuration.EnableAutoWidth)
             {
-                columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholders(writer, props);
+                columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholdersAsync(writer, props);
                 widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth, props);
             }
             else
@@ -314,7 +314,7 @@ namespace MiniExcelLibs.OpenXml
             }
             if (_configuration.EnableAutoWidth)
             {
-                await OverWriteColumnWidthPlaceholders(writer, columnWidthsPlaceholderPosition, widths.Columns);
+                await OverWriteColumnWidthPlaceholdersAsync(writer, columnWidthsPlaceholderPosition, widths.Columns);
             }
         }
 
@@ -342,7 +342,7 @@ namespace MiniExcelLibs.OpenXml
             long columnWidthsPlaceholderPosition = 0;
             if (_configuration.EnableAutoWidth)
             {
-                columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholders(writer, props);
+                columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholdersAsync(writer, props);
                 widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth, props);
             }
             else
@@ -389,20 +389,20 @@ namespace MiniExcelLibs.OpenXml
             }
             if (_configuration.EnableAutoWidth)
             {
-                await OverWriteColumnWidthPlaceholders(writer, columnWidthsPlaceholderPosition, widths.Columns);
+                await OverWriteColumnWidthPlaceholdersAsync(writer, columnWidthsPlaceholderPosition, widths.Columns);
             }
 
             await writer.WriteAsync(WorksheetXml.EndWorksheet);
         }
 
-        private async Task<long> WriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, ICollection<ExcelColumnInfo> props)
+        private async Task<long> WriteColumnWidthPlaceholdersAsync(MiniExcelAsyncStreamWriter writer, ICollection<ExcelColumnInfo> props)
         {
             var placeholderPosition = await writer.FlushAsync();
             await writer.WriteWhiteSpaceAsync(WorksheetXml.GetColumnPlaceholderLength(props.Count));
             return placeholderPosition;
         }
 
-        private async Task OverWriteColumnWidthPlaceholders(MiniExcelAsyncStreamWriter writer, long placeholderPosition, IEnumerable<ExcelColumnWidth> columnWidths)
+        private async Task OverWriteColumnWidthPlaceholdersAsync(MiniExcelAsyncStreamWriter writer, long placeholderPosition, IEnumerable<ExcelColumnWidth> columnWidths)
         {
             var position = await writer.FlushAsync();
 
