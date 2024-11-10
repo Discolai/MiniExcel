@@ -104,6 +104,8 @@ namespace MiniExcelLibs.OpenXml
             var yIndex = 1;
             int maxColumnIndex;
             int maxRowIndex;
+            ExcelWidthCollection widths = null;
+            long columnWidthsPlaceholderPosition = 0;
             {
                 if (_configuration.FastMode)
                 {
@@ -119,7 +121,15 @@ namespace MiniExcelLibs.OpenXml
                 }
                 maxColumnIndex = props.Count;
 
-                await WriteColumnsWidthsAsync(writer, ExcelColumnWidth.FromProps(props));
+                if (_configuration.EnableAutoWidth)
+                {
+                    columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholders(writer, props);
+                    widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth, props);
+                }
+                else
+                {
+                    await WriteColumnsWidthsAsync(writer, ExcelColumnWidth.FromProps(props));
+                }
 
                 await writer.WriteAsync(WorksheetXml.StartSheetData);
                 int fieldCount = reader.FieldCount;
@@ -136,7 +146,7 @@ namespace MiniExcelLibs.OpenXml
                     for (int i = 0; i < fieldCount; i++)
                     {
                         var cellValue = reader.GetValue(i);
-                        await WriteCellAsync(writer, yIndex, xIndex, cellValue, props[i]);
+                        await WriteCellAsync(writer, yIndex, xIndex, cellValue, props[i], widths);
                         xIndex++;
                     }
                     await writer.WriteAsync(WorksheetXml.EndRow);
@@ -159,6 +169,10 @@ namespace MiniExcelLibs.OpenXml
             if (_configuration.FastMode)
             {
                 await WriteDimensionAsync(writer, maxRowIndex, maxColumnIndex, dimensionPlaceholderPostition);
+            }
+            if (_configuration.EnableAutoWidth)
+            {
+                await OverWriteColumnWidthPlaceholders(writer, columnWidthsPlaceholderPosition, widths.Columns);
             }
         }
 
@@ -324,7 +338,17 @@ namespace MiniExcelLibs.OpenXml
                 props.Add(prop);
             }
 
-            await WriteColumnsWidthsAsync(writer, ExcelColumnWidth.FromProps(props));
+            ExcelWidthCollection widths = null;
+            long columnWidthsPlaceholderPosition = 0;
+            if (_configuration.EnableAutoWidth)
+            {
+                columnWidthsPlaceholderPosition = await WriteColumnWidthPlaceholders(writer, props);
+                widths = new ExcelWidthCollection(_configuration.MinWidth, _configuration.MaxWidth, props);
+            }
+            else
+            {
+                await WriteColumnsWidthsAsync(writer, ExcelColumnWidth.FromProps(props));
+            }
 
             await writer.WriteAsync(WorksheetXml.StartSheetData);
             if (_printHeader)
@@ -350,7 +374,7 @@ namespace MiniExcelLibs.OpenXml
                 for (int j = 0; j < value.Columns.Count; j++)
                 {
                     var cellValue = value.Rows[i][j];
-                    await WriteCellAsync(writer, yIndex, xIndex, cellValue, props[j]);
+                    await WriteCellAsync(writer, yIndex, xIndex, cellValue, props[j], widths);
                     xIndex++;
                 }
                 await writer.WriteAsync(WorksheetXml.EndRow);
@@ -362,6 +386,10 @@ namespace MiniExcelLibs.OpenXml
             if (_configuration.AutoFilter)
             {
                 await writer.WriteAsync(WorksheetXml.Autofilter(GetDimensionRef(maxRowIndex, maxColumnIndex)));
+            }
+            if (_configuration.EnableAutoWidth)
+            {
+                await OverWriteColumnWidthPlaceholders(writer, columnWidthsPlaceholderPosition, widths.Columns);
             }
 
             await writer.WriteAsync(WorksheetXml.EndWorksheet);
@@ -496,7 +524,7 @@ namespace MiniExcelLibs.OpenXml
             await writer.WriteAsync(WorksheetXml.Cell(cellReference, "str", "1", ExcelOpenXmlUtils.EncodeXML(columnName)));
         }
 
-        private async Task WriteCellAsync(MiniExcelAsyncStreamWriter writer, int rowIndex, int cellIndex, object value, ExcelColumnInfo p, ExcelWidthCollection widthCollection = null)
+        private async Task WriteCellAsync(MiniExcelAsyncStreamWriter writer, int rowIndex, int cellIndex, object value, ExcelColumnInfo p, ExcelWidthCollection widthCollection)
         {
             var columnReference = ExcelOpenXmlUtils.ConvertXyToCell(cellIndex, rowIndex);
             var valueIsNull = value is null || value is DBNull;
