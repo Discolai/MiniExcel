@@ -1426,5 +1426,29 @@ namespace MiniExcelLibs.Tests
             }
         }
 
+        [Fact]
+        public async Task AutoAdjustWidthThrowsExceptionWithoutFastMode()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
+            var items = new List<object>
+            {
+                new
+                {
+                    Name = "Some name",
+                    Type = "Some type",
+                },
+                new
+                {
+                    Name = "Another name",
+                    Type = "Another type",
+                }
+            };
+
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => MiniExcel.SaveAsAsync(path, items, configuration: new OpenXmlConfiguration
+            {
+                EnableAutoWidth = true,
+            }));
+        }
     }
 }
